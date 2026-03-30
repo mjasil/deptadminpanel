@@ -25,18 +25,19 @@ interface Order {
   customerSize?: string;
   items: OrderItem[];
   total: number;
+  totalPrice?: number;
   paymentMethod: string;
   paymentId: string;
   status: string;
-  createdAt: any; // Firebase Timestamp or Date
+  createdAt: any;
 }
 
 const statusColors: Record<string, string> = {
-  pending:   'bg-yellow-600 text-white',
-  confirmed: 'bg-blue-600 text-white',
-  shipped:   'bg-purple-600 text-white',
-  delivered: 'bg-green-600 text-white',
-  cancelled: 'bg-red-600 text-white',
+  pending:   'bg-yellow-600',
+  confirmed: 'bg-blue-600',
+  shipped:   'bg-purple-600',
+  delivered: 'bg-green-600',
+  cancelled: 'bg-red-600',
 };
 
 const Orders = () => {
@@ -56,10 +57,9 @@ const Orders = () => {
         ...doc.data(),
       })) as Order[];
 
-      // Sort by createdAt descending (newest first)
       ordersData.sort((a, b) => {
-        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt) || 0;
-        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt) || 0;
+        const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0;
+        const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0;
         return bTime - aTime;
       });
 
@@ -80,15 +80,18 @@ const Orders = () => {
       );
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update status. Try again.');
     } finally {
       setUpdatingId(null);
     }
   };
 
+  // Safely get total — handles both 'total' and 'totalPrice' field names
+  const getTotal = (order: Order): number => {
+    return Number(order.total ?? order.totalPrice ?? 0);
+  };
+
   const formatDate = (timestamp: any) => {
     try {
-      // Handle Firebase Timestamp
       const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
       return date.toLocaleDateString('en-IN', {
         year: 'numeric',
@@ -107,7 +110,7 @@ const Orders = () => {
       <div className="flex items-center justify-center py-20">
         <div className="text-white text-center">
           <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-          <p>Loading orders...</p>
+          <p className="text-gray-400">Loading orders...</p>
         </div>
       </div>
     );
@@ -139,11 +142,28 @@ const Orders = () => {
                   {formatDate(order.createdAt)}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="bg-blue-600 text-white text-lg font-bold px-3 py-1 rounded-lg">
-                  ₹{Number(order.total).toLocaleString()}
-                </div>
+              <div className="bg-blue-600 text-white text-lg font-bold px-3 py-1 rounded-lg">
+                ₹{getTotal(order).toLocaleString()}
               </div>
+            </div>
+
+            {/* Status Dropdown */}
+            <div className="mb-4 flex items-center gap-2">
+              <select
+                value={order.status || 'pending'}
+                onChange={(e) => updateStatus(order.id, e.target.value)}
+                disabled={updatingId === order.id}
+                className={`text-xs font-bold px-3 py-1 rounded-full border-0 cursor-pointer text-white ${statusColors[order.status] || 'bg-yellow-600'}`}
+              >
+                <option value="pending">🕐 Pending</option>
+                <option value="confirmed">✅ Confirmed</option>
+                <option value="shipped">🚚 Shipped</option>
+                <option value="delivered">📦 Delivered</option>
+                <option value="cancelled">❌ Cancelled</option>
+              </select>
+              {updatingId === order.id && (
+                <span className="text-gray-400 text-xs">Updating...</span>
+              )}
             </div>
 
             {/* Customer Details */}
@@ -162,7 +182,7 @@ const Orders = () => {
                   {order.customerCity && `, ${order.customerCity}`}
                   {order.customerState && `, ${order.customerState}`}
                   {order.customerPin && ` - ${order.customerPin}`}
-                  {order.customerLandmark && ` (${order.customerLandmark})`}
+                  {order.customerLandmark && ` (Near ${order.customerLandmark})`}
                 </span>
               </div>
               {order.customerSize && order.customerSize !== 'N/A' && (
@@ -173,5 +193,62 @@ const Orders = () => {
               )}
               <div className="flex items-start">
                 <CreditCard className="w-4 h-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-300 text-sm capitalize">
-                  {order.paymentMethod ===
+                <span className="text-gray-300 text-sm">
+                  {order.paymentMethod === 'cod' ? '💵 Cash on Delivery' : '💳 Online Payment'}
+                  {order.paymentId && order.paymentId !== 'COD' && order.paymentId !== 'PENDING' && (
+                    <span className="text-gray-500 ml-1 text-xs">({order.paymentId})</span>
+                  )}
+                </span>
+              </div>
+              {order.customerInsta && (
+                <div className="flex items-start">
+                  <span className="text-gray-400 text-xs mr-2 mt-0.5">📸</span>
+                  <span className="text-blue-400 text-sm">{order.customerInsta}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Order Items */}
+            {order.items && order.items.length > 0 && (
+              <div className="mb-4">
+                <p className="text-gray-400 text-xs font-semibold uppercase mb-2">Items Ordered</p>
+                <div className="space-y-1 bg-gray-900 rounded-lg p-3">
+                  {order.items.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <Package className="w-3 h-3 text-gray-500 mr-1 flex-shrink-0" />
+                        <span className="text-gray-300 text-sm">{item.name}</span>
+                        <span className="text-gray-500 text-xs ml-1">x{item.quantity}</span>
+                      </div>
+                      <span className="text-white text-sm font-medium">
+                        ₹{Number(item.price * item.quantity).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Order ID */}
+            <div className="pt-3 border-t border-gray-700">
+              <span className="text-xs text-gray-500">Order ID: {order.id}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {orders.length === 0 && (
+        <div className="text-center py-12">
+          <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-400 text-lg">No orders yet</p>
+          <p className="text-gray-500 text-sm mt-2">
+            Orders from your store will appear here automatically
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Orders;
