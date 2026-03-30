@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, X } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -247,13 +247,18 @@ const Products = () => {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Category
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
-                />
+                >
+                  <option value="">Select a category</option>
+                  <option value="watch">watch</option>
+                  <option value="shoe">shoe</option>
+                  <option value="headphone">headphone</option>
+                  <option value="airpods">airpods</option>
+                </select>
               </div>
 
               <div>
